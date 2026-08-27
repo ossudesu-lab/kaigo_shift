@@ -1,0 +1,30 @@
+#!/bin/sh
+# 実データ・実名入りExcelが公開リポジトリに入るのを機械的に止める番人。
+#
+# 導入:
+#   cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+#
+# .gitignore だけでは、うっかり git add -f したときに防げない。
+# 職場で毎月動かす以上、実データは増え続けるので二重に止める。
+
+staged=$(git diff --cached --name-only --diff-filter=AM)
+
+paths=$(printf '%s\n' "$staged" | grep -Ei '(\.xlsx?$|^data/|^out/|^actual_.*\.csv$|^requests_.*\.csv$|^carryover_.*\.ya?ml$)')
+if [ -n "$paths" ]; then
+  echo "コミットを中止しました。実データの可能性があるファイルが含まれています。"
+  printf '%s\n' "$paths" | sed 's/^/  /'
+  echo
+  echo "本当に必要な場合のみ: git commit --no-verify"
+  exit 1
+fi
+
+words=$(printf '%s\n' "$staged" | xargs -r grep -lIE '産休|育休|妊娠|出産|通院|入院|持病|休職' 2>/dev/null)
+if [ -n "$words" ]; then
+  echo "コミットを中止しました。個人の事情に触れる語が含まれています。"
+  printf '%s\n' "$words" | sed 's/^/  /'
+  echo
+  echo "職員IDと結びつくと本人が特定されます。表現を一般化してください。"
+  exit 1
+fi
+
+exit 0
